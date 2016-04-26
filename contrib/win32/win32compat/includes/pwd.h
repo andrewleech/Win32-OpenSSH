@@ -10,7 +10,7 @@ struct passwd
 	char	*pw_gecos;	/* ??? */
 	uid_t	pw_uid;		/* numerical user ID */
 	gid_t	pw_gid;		/* numerical group ID */
-	char	*pw_dir;	/* initial working directory */
+	wchar_t	*pw_dir;	/* initial working directory */
 	char	*pw_shell;	/* path to shell */
 };
 

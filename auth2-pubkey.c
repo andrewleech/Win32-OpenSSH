@@ -230,12 +230,6 @@ userauth_pubkey(Authctxt *authctxt)
 
     targetIsCurrent = (strcmp(currentUser, authctxt -> user) == 0);
     
-    if (targetIsCurrent)
-    {
-      doOpenSSHVerify = 1;
-    }
-    else
-    {
       loginStat = LsaLogon(&authctxt -> hTokenLsa_, HomeDirLsaW,
                                authctxt -> user, pkblob, blen, sig, slen,
                                  buffer_ptr(&b), buffer_len(&b), datafellows);
@@ -275,7 +269,11 @@ userauth_pubkey(Authctxt *authctxt)
           free(sig);
         }
       }
-    }
+	  else if (targetIsCurrent)
+	  {
+		  doOpenSSHVerify = 1;
+	  }
+
     
     if (doOpenSSHVerify)
     {
@@ -284,14 +282,21 @@ userauth_pubkey(Authctxt *authctxt)
        */
       
       authctxt -> pw -> pw_dir = GetHomeDir(authctxt -> user);
-  
+	  
       if (PRIVSEP(user_key_allowed(authctxt->pw, key, 0))  //PRAGMA:TODO
 		  &&
               PRIVSEP(key_verify(key, sig, slen, buffer_ptr(&b), buffer_len(&b))) == 1)
     
-      {
-        authenticated = 1;
-      }
+	  {
+		  HANDLE phndl = GetCurrentProcess();
+
+		  authenticated = 1;
+		  /*
+		  * Get the current process user authentication token for use later on.
+		  */
+		  //OpenProcessToken(phndl, TOKEN_READ, &authctxt->methoddata); // <-- seems to break my current windows login user, quite badly, vc runtime errors in current session on other applications
+			
+	  }
     }
     
     /*

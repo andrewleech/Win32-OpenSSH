@@ -579,7 +579,7 @@ do_exec_no_pty(Session *s, const char *command)
   int sockout[2];
   int sockerr[2];
   
-  BOOL b;
+  BOOL b = 0;
   
   HANDLE hToken = INVALID_HANDLE_VALUE;
   
@@ -809,15 +809,17 @@ do_exec_no_pty(Session *s, const char *command)
     debug("Using token from NtCreateToken()...");
       
     hToken = (HANDLE) PwdCreateUserToken(s -> authctxt -> user, NULL, "sshd");
+
+	ModifyRightsToDesktop(hToken, 1);
   }
     
-  #endif
+  #else
     
   /*
    * Next try pass-auth token.
    */
   
-  else
+  else if (s->authctxt->methoddata)
   {
     debug("Using token from LogonUser()...");
     
@@ -832,7 +834,7 @@ do_exec_no_pty(Session *s, const char *command)
 
     ModifyRightsToDesktop(hToken, 1);
   }
-
+#endif
   /*
    * Set display if needed
    */
@@ -846,7 +848,7 @@ do_exec_no_pty(Session *s, const char *command)
    * Get user homedir if needed.
    */
   
-  if (1) // (s -> pw -> pw_dir == NULL || s -> pw -> pw_dir[0] == '\0')
+  if (s -> pw -> pw_dir == NULL || s -> pw -> pw_dir[0] == '\0')
   {
     /*
      * If there is homedir from LSA use it.
@@ -887,9 +889,12 @@ do_exec_no_pty(Session *s, const char *command)
   SetEnvironmentVariableW(L"USERPROFILE", s -> pw -> pw_dir);
   
   // find the server name of the domain controller which created this token
-  GetDomainFromToken ( &hToken, buf, sizeof(buf));
-  if (buf[0])
-	  SetEnvironmentVariable("USERDOMAIN", buf );
+  if (hToken && hToken != INVALID_HANDLE_VALUE)
+  {
+	  GetDomainFromToken(&hToken, buf, sizeof(buf));
+	  if (buf[0])
+		  SetEnvironmentVariable("USERDOMAIN", buf);
+  }
 
   /*
    * Set SSH_CLIENT variable.
@@ -965,9 +970,12 @@ do_exec_no_pty(Session *s, const char *command)
   DWORD	dwStartupFlags = CREATE_SUSPENDED ;  // 0
  
   SetConsoleCtrlHandler(NULL, FALSE);
-  b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
-                              /*CREATE_NEW_PROCESS_GROUP*/ dwStartupFlags, NULL, s -> pw -> pw_dir,
-                                  &si, &pi);
+  if (hToken && hToken != INVALID_HANDLE_VALUE)
+  {
+	  b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
+		  /*CREATE_NEW_PROCESS_GROUP*/ dwStartupFlags, NULL, s->pw->pw_dir,
+		  &si, &pi);
+  }
   /*
    * If CreateProcessAsUser() fails we will try CreateProcess()
    * but only if current user and login user are the same.
