@@ -244,8 +244,8 @@ char *realpathWin32(const char *path, char resolved[PATH_MAX])
 		realpath[3] = 0;
 	}
 
-	resolved[0] = *path; // will be our first slash in /x:/users/test1 format
-	strncpy(resolved + 1, realpath, sizeof(realpath));
+	resolved[0] = path[0]; // will be our first slash in /x:/users/test1 format
+	strlcpy(resolved + 1, realpath, sizeof(realpath)-1);
 	return resolved;
 }
 

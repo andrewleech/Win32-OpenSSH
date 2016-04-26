@@ -1402,14 +1402,17 @@ process_realpath(u_int32_t id)
 		// c:/users/test1 will become /c:/users/test1
 		resolvedname[0] = '/';
 
-		_getcwd(&resolvedname[1], sizeof(resolvedname));
+		_getcwd(&resolvedname[1], sizeof(resolvedname)-1);
+		
 		// convert back slashes to forward slashes to be compatibale with unix naming
-		char *cptr = resolvedname;
-		while (*cptr) {
-			if (*cptr == '\\')
-				*cptr = '/' ;
-			cptr++;
-		}
+		resolvedname[PATH_MAX - 1] = 0;
+		slashconvert(resolvedname);
+		//char *cptr = resolvedname;
+		//while ((*cptr) && (cptr < &resolvedname[PATH_MAX])) {
+		//	if (*cptr == '\\')
+		//		*cptr = '/' ;
+		//	cptr++;
+		//}
 		path = strdup(resolvedname);
 	}
 	else {
@@ -1421,7 +1424,7 @@ process_realpath(u_int32_t id)
 			resolvedname[0] = '/';
 			resolvedname[1] = _getdrive() + 'A' - 1; // convert current drive letter to Windows driver Char
 			resolvedname[2] = ':';
-			strcpy(&resolvedname[3], path);
+			strncpy_s(&resolvedname[3], sizeof(resolvedname)-3, path, _TRUNCATE);
 			free(path);
 			path = strdup(resolvedname);
 		}
@@ -1431,7 +1434,7 @@ process_realpath(u_int32_t id)
 				if (path[0] == '/') { // it was /x:/home/x:/dir form, use last drive letter part
 					pch--;
 					resolvedname[0] = '/';
-					strcpy(resolvedname+1, pch);
+					strncpy_s(&resolvedname[1], sizeof(resolvedname)-1, pch, _TRUNCATE);
 					free(path);
 					path = strdup(resolvedname);
 				}
