@@ -579,7 +579,7 @@ do_exec_no_pty(Session *s, const char *command)
   int sockout[2];
   int sockerr[2];
   
-  BOOL b;
+  BOOL b = 0;
   
   HANDLE hToken = INVALID_HANDLE_VALUE;
   
@@ -973,11 +973,48 @@ do_exec_no_pty(Session *s, const char *command)
    * but only if current user and login user are the same.
    */
 
-  if ((!b) && (strcmp(name, s -> pw -> pw_name) == 0))
+  if ((!b) && (strcmp(name, s->pw->pw_name) == 0))
   {
-    b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE, 
-                          /*CREATE_NEW_PROCESS_GROUP*/ 	dwStartupFlags, NULL, s -> pw -> pw_dir,
-                              &si, &pi);
+	  // If multiple commands given, run through cmd.exe to process as batch
+	  if (strrchr(exec_command, ';') || strrchr(exec_command, '&'))
+	  {
+		  #define MAX_CMD_LEN (32 * 1024)
+		  wchar_t cmd_path_w[MAX_PATH];
+		  wchar_t cmd_command_w[MAX_CMD_LEN] = { L"/c " };
+		  
+		  GetSystemDirectoryW(cmd_path_w, MAX_PATH);
+		  wcsncpy_s(&cmd_path_w[lstrlenW(cmd_path_w)], MAX_PATH - lstrlenW(cmd_path_w), L"\\cmd.exe", _TRUNCATE);
+
+		  
+		  wchar_t *cmd_p = cmd_command_w+3;
+		  wchar_t *token;// = exec_command_w;
+		  wchar_t *last = NULL;
+		  for (token = wcstok(exec_command_w, L";&", &last); token != NULL; token = wcstok(NULL, L";&", &last))
+		  {
+			  if (wcsstr(token, L"cd ") == token) { // Add /D to cd to ensure it will switch to the drive of the desired path 
+				  wcsncpy_s(cmd_command_w+lstrlenW(cmd_command_w), MAX_CMD_LEN - lstrlenW(cmd_command_w), L"cd /D ", _TRUNCATE);
+				  wcsncpy_s(cmd_command_w + lstrlenW(cmd_command_w), MAX_CMD_LEN - lstrlenW(cmd_command_w), &token[3], _TRUNCATE);
+			  }
+			  else {
+				  wcsncpy_s(cmd_command_w + lstrlenW(cmd_command_w), MAX_CMD_LEN - lstrlenW(cmd_command_w), token, _TRUNCATE);
+			  }
+			  wcsncpy_s(cmd_command_w + lstrlenW(cmd_command_w), MAX_CMD_LEN - lstrlenW(cmd_command_w), L" && ", _TRUNCATE);
+		  }
+		  if (last) {
+			  cmd_command_w[lstrlenW(cmd_command_w) - 4] = 0; // Remove trailing &&
+		  }
+		  else {
+			  wcsncpy_s(cmd_command_w + lstrlenW(cmd_command_w), MAX_CMD_LEN - lstrlenW(cmd_command_w), exec_command_w, MAX_PATH);
+		  }
+		  b = CreateProcessW(cmd_path_w, cmd_command_w, NULL, NULL, TRUE,
+			  /*CREATE_NEW_PROCESS_GROUP*/ 	dwStartupFlags, NULL, s->pw->pw_dir,
+			  &si, &pi);
+	  } else
+	  {
+		  b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
+			  /*CREATE_NEW_PROCESS_GROUP*/ 	dwStartupFlags, NULL, s->pw->pw_dir,
+			  &si, &pi);
+	  }
   }
 
   if (!b)
