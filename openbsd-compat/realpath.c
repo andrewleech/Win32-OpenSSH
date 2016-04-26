@@ -229,7 +229,12 @@ char *realpathWin32(const char *path, char resolved[PATH_MAX])
 {
 	char realpath[PATH_MAX];
 
-	strlcpy(resolved, path + 1, sizeof(realpath));
+	char *second_idx = strchr(&resolved[3], ':');
+	if (second_idx) {
+		strlcpy(resolved, second_idx-1, sizeof(realpath));
+	} else {
+		strlcpy(resolved, path + 1, sizeof(realpath));
+	}
 	backslashconvert(resolved);
 	PathCanonicalizeA(realpath, resolved);
 	slashconvert(realpath);
@@ -254,12 +259,17 @@ char *realpathWin32i(const char *path, char resolved[PATH_MAX])
 {
 	char realpath[PATH_MAX];
 
-	if (path[0] != '/') {
-		// absolute form x:/abc/def given, no first slash to take out
-		strlcpy(resolved, path, sizeof(realpath));
+	char *last_drive = strrchr(path, ':');
+	if (last_drive) {
+		strlcpy(resolved, last_drive - 1, sizeof(realpath));
+	} else {
+		if (path[0] != '/') {
+			// absolute form x:/abc/def given, no first slash to take out
+			strlcpy(resolved, path, sizeof(realpath));
+		} else {
+			strlcpy(resolved, path + 1, sizeof(realpath));
+		}
 	}
-	else
-		strlcpy(resolved, path + 1, sizeof(realpath));
 
 	backslashconvert(resolved);
 	PathCanonicalizeA(realpath, resolved);
